@@ -1,0 +1,3 @@
+pyicloud
+mysql-connector-python
+keyrings.alt

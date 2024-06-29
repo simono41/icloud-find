@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+    #ports:
+    #  - "3306:3306"
+    restart: always
+    networks:
+      default:
+      dns:
+        ipv4_address: 172.28.0.40
+
+  app:
+    build: .
+    environment:
+      ICLOUD_EMAIL: ${ICLOUD_EMAIL}
+      ICLOUD_PASSWORD: ${ICLOUD_PASSWORD}
+      ICLOUD_2FA_CODE: ${ICLOUD_2FA_CODE}
+      DB_HOST: ${DB_HOST}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    depends_on:
+      - mariadb
+    volumes:
+      - ./keyring_data:/root/.local/share/python_keyring  # Persistenter Speicher für den Keyring
+    #restart: always
+    networks:
+      default:
+      dns:
+        ipv4_address: 172.28.0.41
+
+networks:
+  dns:
+    name: dns
+    external: true
