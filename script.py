@@ -71,27 +71,38 @@ cursor.execute("""
     )
 """)
 
-# Standortdaten abrufen
-devices = icloud.devices
+# Endlosschleife für die Abfrage alle 10 Minuten
+try:
+    while True:
+        # Standortdaten von Geräten abrufen
+        devices = icloud.devices
+        for device in devices:
+            location = device.location()
+            if location:
+                device_name = device['name']
+                latitude = location['latitude']
+                longitude = location['longitude']
+                timestamp = datetime.fromtimestamp(location['timeStamp'] / 1000)
 
-for device in devices:
-    location = device.location()
-    if location:
-        device_name = device['name']
-        latitude = location['latitude']
-        longitude = location['longitude']
-        timestamp = datetime.fromtimestamp(location['timeStamp'] / 1000)
+                # Koordinaten in der Konsole ausgeben
+                logging.info(f"Gerät: {device_name}, Latitude: {latitude}, Longitude: {longitude}, Zeit: {timestamp}")
 
-        # Koordinaten in der Konsole ausgeben
-        logging.info(f"Gerät: {device_name}, Latitude: {latitude}, Longitude: {longitude}, Zeit: {timestamp}")
+                # Daten in die Datenbank einfügen
+                cursor.execute("""
+                    INSERT INTO device_locations (device_name, latitude, longitude, timestamp)
+                    VALUES (%s, %s, %s, %s)
+                """, (device_name, latitude, longitude, timestamp))
 
-        # Daten in die Datenbank einfügen
-        cursor.execute("""
-            INSERT INTO device_locations (device_name, latitude, longitude, timestamp)
-            VALUES (%s, %s, %s, %s)
-        """, (device_name, latitude, longitude, timestamp))
+        # Änderungen speichern
+        db.commit()
 
-# Änderungen speichern und Verbindung schließen
-db.commit()
-cursor.close()
-db.close()
+        # 10 Minuten warten
+        logging.info("Warten auf die nächste Abfrage in 10 Minuten...")
+        time.sleep(600)
+
+except KeyboardInterrupt:
+    logging.info("Skript manuell beendet.")
+
+finally:
+    cursor.close()
+    db.close()
