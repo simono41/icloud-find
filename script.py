@@ -14,6 +14,9 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # Keyring auf Dateisystem setzen
 keyring.set_keyring(PlaintextKeyring())
 
+# Schwellenwert für Positionsänderung (in Dezimalgrad)
+CHANGE_THRESHOLD = 0.0001
+
 # Datenbankverbindung prüfen
 def connect_to_database():
     while True:
@@ -31,6 +34,10 @@ def connect_to_database():
             logging.error(f"Fehler beim Verbinden zur Datenbank: {e}")
             logging.info("Erneuter Verbindungsversuch in 5 Sekunden...")
             time.sleep(5)
+
+# Funktion zur Überprüfung der Positionsänderung
+def has_significant_change(last_lat, last_lon, new_lat, new_lon):
+    return abs(last_lat - new_lat) > CHANGE_THRESHOLD or abs(last_lon - new_lon) > CHANGE_THRESHOLD
 
 # iCloud-Verbindung herstellen
 icloud = PyiCloudService(
@@ -84,14 +91,23 @@ try:
                 longitude = location['longitude']
                 timestamp = datetime.fromtimestamp(location['timeStamp'] / 1000)
 
-                # Koordinaten in der Konsole ausgeben
-                logging.info(f"Gerät: {device_name}, Latitude: {latitude}, Longitude: {longitude}, Zeit: {timestamp}")
-
-                # Daten in die Datenbank einfügen
+                # Letzten Eintrag abrufen
                 cursor.execute("""
-                    INSERT INTO device_locations (device_name, latitude, longitude, timestamp)
-                    VALUES (%s, %s, %s, %s)
-                """, (device_name, latitude, longitude, timestamp))
+                    SELECT latitude, longitude FROM device_locations
+                    WHERE device_name = %s
+                    ORDER BY timestamp DESC LIMIT 1
+                """, (device_name,))
+                last_entry = cursor.fetchone()
+
+                # Nur einfügen, wenn sich die Position signifikant geändert hat
+                if last_entry is None or has_significant_change(last_entry[0], last_entry[1], latitude, longitude):
+                    logging.info(f"Gerät: {device_name}, Latitude: {latitude}, Longitude: {longitude}, Zeit: {timestamp}")
+                    cursor.execute("""
+                        INSERT INTO device_locations (device_name, latitude, longitude, timestamp)
+                        VALUES (%s, %s, %s, %s)
+                    """, (device_name, latitude, longitude, timestamp))
+                else:
+                    logging.info(f"Keine signifikante Positionsänderung für {device_name}. Eintrag übersprungen.")
 
         # Änderungen speichern
         db.commit()

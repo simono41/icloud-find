@@ -32,7 +32,7 @@ services:
       - mariadb
     volumes:
       - ./keyring_data:/root/.local/share/python_keyring  # Persistenter Speicher für den Keyring
-    #restart: always
+    restart: always
     networks:
       default:
       dns:
